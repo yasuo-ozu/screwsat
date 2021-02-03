@@ -701,6 +701,7 @@ pub mod solver {
         heap: Vec<Var>,
         indices: Vec<Option<usize>>,
         activity: Vec<f64>,
+        priority: Vec<usize>,
         bump_inc: f64,
     }
     impl Default for Heap {
@@ -709,6 +710,7 @@ pub mod solver {
                 heap: Vec::default(),
                 indices: Vec::default(),
                 activity: Vec::default(),
+                priority: Vec::default(),
                 bump_inc: 1.0,
             }
         }
@@ -719,13 +721,20 @@ pub mod solver {
                 heap: (0..n).map(|x| Var(x as u32)).collect(),
                 indices: (0..n).map(Some).collect(),
                 activity: vec![0.0; n],
+                priority: vec![0; n],
                 bump_inc,
             }
         }
 
         fn gt(&self, left: Var, right: Var) -> bool {
-            self.activity[left] > self.activity[right]
+            use std::cmp::Ordering;
+            match self.priority[left].cmp(&self.priority[right]) {
+                Ordering::Greater => true,
+                Ordering::Less => false,
+                _ => self.activity[left] > self.activity[right],
+            }
         }
+
         #[allow(dead_code)]
         fn top(self) -> Option<Var> {
             if self.heap.is_empty() {
@@ -831,6 +840,7 @@ pub mod solver {
             while (v.0 as usize) >= self.indices.len() {
                 self.indices.push(None);
                 self.activity.push(0.0);
+                self.priority.push(0);
             }
             self.indices[v] = Some(self.heap.len());
             self.heap.push(v);
@@ -1127,6 +1137,15 @@ pub mod solver {
                 }
             });
             solver
+        }
+
+        /// Set polarity for given variable.
+        pub fn set_polarity_and_priority(&mut self, var: Var, polarity: bool, priority: usize) {
+            while var.0 as usize >= self.vardata.assigns.len() {
+                self.new_var();
+            }
+            self.vardata.polarity[var] = polarity;
+            self.order_heap.priority[var] = priority;
         }
 
         // Create a new space for one variable.
